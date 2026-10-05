@@ -91,7 +91,7 @@
     const a=i/40*TAU,x=Math.cos(a)*1.4,y=Math.sin(a)*1.4;
     polyline([coinPoint(x,y,-.16),coinPoint(x,y,.16)],.38,'coin');
   }
-  // A closed, engraved outline gives the dollar sign the coin's
+  // A closed, engraved outline gives the dollar sign the blueprint reference's
   // broad letterform instead of a thin S made from overlapping center strokes.
   const dollarOutline=new THREE.Shape();
   dollarOutline.moveTo(.62,.39);

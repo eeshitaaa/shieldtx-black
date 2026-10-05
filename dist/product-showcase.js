@@ -53,5 +53,9 @@
  });
  let refreshFrame;
  new ResizeObserver(()=>{cancelAnimationFrame(refreshFrame);refreshFrame=requestAnimationFrame(()=>ScrollTrigger.refresh());}).observe(document.querySelector('#how-it-works'));
+ const phoneImage=section.querySelector('.product-phone img');
+ const refreshScreen=()=>requestAnimationFrame(()=>ScrollTrigger.refresh());
+ if(phoneImage.complete)refreshScreen();else phoneImage.addEventListener('load',refreshScreen,{once:true});
+ addEventListener('pageshow',refreshScreen);
  document.fonts.ready.then(()=>ScrollTrigger.refresh());
 })();

@@ -53,7 +53,7 @@
     coin.querySelector('.coin-reeding').setAttribute('d',reed);
     coin.querySelector('.coin-face-detail').setAttribute('transform',`matrix(${Math.abs(c)} 0 0 1 ${frontZ*s} 0)`);
   }
-  function spin(now){coinFrame=0;if(!inView||document.hidden||reduced.matches)return;if(lastTime)angle+=Math.min(now-lastTime,80)*Math.PI/4000;lastTime=now;drawCoin();coinFrame=requestAnimationFrame(spin);}
+  function spin(now){coinFrame=0;if(!inView||document.hidden||reduced.matches||document.documentElement.classList.contains('shared-coin-ready'))return;if(lastTime)angle+=Math.min(now-lastTime,80)*Math.PI/4000;lastTime=now;drawCoin();coinFrame=requestAnimationFrame(spin);}
   function startCoin(){if(inView&&!document.hidden&&!reduced.matches&&!coinFrame){lastTime=0;coinFrame=requestAnimationFrame(spin);}}
   new IntersectionObserver(entries=>{inView=entries[0].isIntersecting;stage.classList.toggle('is-visible',inView);startCoin();},{threshold:.05}).observe(stage);
   document.addEventListener('visibilitychange',startCoin);

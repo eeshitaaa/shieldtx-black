@@ -17,6 +17,7 @@
   let completed=false,trade=1,time=0,last=0,frame=0,visible=false,pinned=null,centers=[],curve=[],curveLength=0;
   let waitingFromBelow=false;
   let runway=0,start=0,span=1,pinTop=100,pinnedLayout=false,lastStage=-1,lastCopy='';
+  let viewportWidth=innerWidth,viewportHeight=innerHeight;
   const setOpacity=(el,value)=>{if(el)el.style.opacity=String(value);};
   function showCopy(message){
     if(message===lastCopy)return;
@@ -81,20 +82,24 @@
     const from=labels[3],to=labels[1],bottom=from.y+36;
     returnRoute.setAttribute('d',`M${from.x} ${from.y}V${bottom-8}Q${from.x} ${bottom} ${from.x-8} ${bottom}H${to.x+8}Q${to.x} ${bottom} ${to.x} ${bottom-8}V${to.y}`);returnRoute.setAttribute('pathLength','1');
     chart.setAttribute('pathLength','1');
-    const sealBounds=seal.getBoundingClientRect();
-    const a={...centers[0],y:centers[0].y-44},b={x:sealBounds.left-bounds.left+sealBounds.width/2,y:sealBounds.top-bounds.top+sealBounds.height/2},lift=innerWidth>700?80:48;curve=[];curveLength=0;
+    // Project the institution's coin center directly; hidden SVG group bounds are unreliable on iOS.
+    const bankSVG=seal.ownerSVGElement,bankBounds=bankSVG.getBoundingClientRect(),view=bankSVG.viewBox.baseVal;
+    const bankScale=Math.min(bankBounds.width/view.width,bankBounds.height/view.height);
+    const bank={x:bankBounds.left-bounds.left+(bankBounds.width-view.width*bankScale)/2+(140-view.x)*bankScale,y:bankBounds.top-bounds.top+(bankBounds.height-view.height*bankScale)/2+(139-view.y)*bankScale};
+    const a={...centers[0],y:centers[0].y-44},b=bank,lift=innerWidth>700?80:48;curve=[];curveLength=0;
     for(let i=0;i<=100;i++){const u=i/100,v=1-u;const x=v*v*v*a.x+3*v*v*u*(a.x+12)+3*v*u*u*(b.x-48)+u*u*u*b.x,y=v*v*v*a.y+3*v*v*u*(a.y-lift)+3*v*u*u*(b.y-lift*.7)+u*u*u*b.y;const prev=curve[i-1];if(prev)curveLength+=Math.hypot(x-prev.x,y-prev.y);curve.push({x,y,d:curveLength});}
     pinTop=16;
     const css=getComputedStyle(section),padding=parseFloat(css.paddingTop)+parseFloat(css.paddingBottom),height=sticky.offsetHeight;
     // Keep the card's bottom visible even when the section is taller than the viewport.
-    pinTop=Math.min(pinTop,innerHeight-height-16);
+    pinTop=Math.min(pinTop,viewportHeight-height-16);
+    diagram.dataset.viewportHeight=String(viewportHeight);
     pinnedLayout=!completed&&!reduced.matches;
-    runway=pinnedLayout?Math.max(800,innerHeight*1.2):0;
+    runway=pinnedLayout?Math.max(800,viewportHeight*1.2):0;
     section.classList.toggle('flow-scroll-story',pinnedLayout);section.style.setProperty('--flow-pin-top',pinTop+'px');
     section.style.minHeight=pinnedLayout?(height+padding+runway)+'px':'';
     const sectionTop=section.getBoundingClientRect().top+scrollY;
-    start=pinnedLayout?sectionTop+parseFloat(css.paddingTop)-pinTop:bounds.top+scrollY-innerHeight*.68;
-    span=pinnedLayout?runway:Math.max(360,bounds.height+innerHeight*.3);
+    start=pinnedLayout?sectionTop+parseFloat(css.paddingTop)-pinTop:bounds.top+scrollY-viewportHeight*.68;
+    span=pinnedLayout?runway:Math.max(360,bounds.height+viewportHeight*.3);
     render(time);
   }
   function finishFirst(){
@@ -132,8 +137,18 @@
   if(reduced.matches){completed=true;time=endTime()+.4;$('.flow-mode').textContent='TRADE FLOW';}
   measure();onScroll();
   addEventListener('shield-scroll-restored',()=>{measure();waitingFromBelow=scrollY>start+span;onScroll();});
-  addEventListener('scroll',onScroll,{passive:true});
-  let resizePending;addEventListener('resize',()=>{clearTimeout(resizePending);resizePending=setTimeout(()=>{measure();onScroll();},120);});
+  let scrollFrame=0;
+  addEventListener('scroll',()=>{if(!scrollFrame)scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;onScroll();});},{passive:true});
+  // Safari/Chrome address bars resize the viewport during a swipe. Keep the first
+  // trade's runway stable; remeasure on orientation/width or substantial size changes.
+  let resizePending;
+  addEventListener('resize',()=>{
+    if(innerWidth===viewportWidth&&Math.abs(innerHeight-viewportHeight)<180)return;
+    clearTimeout(resizePending);resizePending=setTimeout(()=>{
+      viewportWidth=innerWidth;viewportHeight=innerHeight;measure();onScroll();
+    },120);
+  });
+  document.fonts.ready.then(()=>{measure();onScroll();});
   new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;schedule();},{threshold:.05}).observe(diagram);
   document.addEventListener('visibilitychange',schedule);
   reduced.addEventListener('change',()=>{if(reduced.matches){completed=true;time=endTime()+.4;diagram.dataset.firstTrade='complete';section.classList.remove('flow-scroll-story');section.style.minHeight='';$('.flow-mode').textContent='TRADE FLOW';render(time);}else{$('.flow-mode').textContent='CONTINUOUS TRADES';schedule();}measure();});

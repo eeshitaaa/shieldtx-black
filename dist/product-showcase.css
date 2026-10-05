@@ -84,9 +84,15 @@
 .product-phone{display:none}
 @media(max-width:700px){
  #shieldtx .shieldtx-photo>svg{display:none}
- #shieldtx .shieldtx-photo{width:min(260px,calc(100vw - 88px),calc(54svh * .534));margin-top:28px}
+ #shieldtx .shieldtx-photo{width:min(260px,calc(100vw - 88px),calc(54svh * 0.461250));margin-top:28px}
  .product-phone{display:block;position:relative;padding:7px;background:linear-gradient(135deg,#666,#17191d 20%,#08090b 70%,#52555a);border:1px solid #777;border-radius:28px;box-shadow:0 20px 40px #0008,inset 0 0 0 2px #16181c;overflow:hidden}
  .product-phone img{width:100%;height:auto;border-radius:20px;display:block}
  .phone-home{position:absolute;bottom:10px;left:36%;width:28%;height:3px;border-radius:3px;background:#ffffff80}
  .protection-trigger{white-space:normal;width:calc(100% - 60px);font-size:12px;line-height:1.4;padding:11px 14px}
+}
+
+/* Reserve the screen before image decoding and keep it on its own mobile paint layer. */
+@media(max-width:700px){
+ .product-phone{isolation:isolate;transform:translateZ(0)}
+ .product-phone img{position:relative;width:100%;height:auto;aspect-ratio:738 / 1600;object-fit:contain;opacity:1;visibility:visible}
 }

@@ -4,9 +4,11 @@
     const hero=document.querySelector('.hero-coin-anchor'),radar=document.querySelector('.radar-core'),flow=document.querySelector('.flow-token'),anatomy=document.querySelector('.anatomy-model>[data-part="coin"]');
     if(!hero||!radar||!flow||!anatomy)return;
     const layer=document.createElement('div');layer.className='shared-coin';layer.setAttribute('aria-hidden','true');
-    layer.innerHTML='<div class="shared-coin-halo"></div><svg viewBox="-58 -58 116 116" fill="none"><path class="shared-rear"/><path class="shared-rim"/><path class="shared-front"/><path class="shared-reeding"/><g class="shared-face"><circle r="39"/><circle r="35"/><path d="M0-29V29M13-17C7-29-16-24-15-10C-14 3 16-3 15 12C14 27-10 28-16 16"/></g></svg>';
+    layer.innerHTML='<div class="shared-coin-halo"></div><svg viewBox="-58 -58 116 116" fill="none"><defs><clipPath id="shared-wallet-clip" clipPathUnits="userSpaceOnUse"><rect x="-58" y="-58" width="116" height="116"/></clipPath></defs><g clip-path="url(#shared-wallet-clip)"><path class="shared-rear"/><path class="shared-rim"/><path class="shared-front"/><path class="shared-reeding"/><g class="shared-face"><circle r="39"/><circle r="35"/><path d="M0-29V29M13-17C7-29-16-24-15-10C-14 3 16-3 15 12C14 27-10 28-16 16"/></g></g></svg>';
     document.body.append(layer);
-    const ns='http://www.w3.org/2000/svg',anchor=document.createElementNS(ns,'circle');anchor.setAttribute('r','44');anchor.setAttribute('class','journey-anchor');anatomy.append(anchor);
+    const diagram=document.querySelector('.flow-diagram'),anatomyStage=document.querySelector('.anatomy-stage');
+    const heroScene=document.querySelector('[data-institution="hero"]'),wallet=document.querySelector('#fund-wallet');
+    const clipRect=layer.querySelector('#shared-wallet-clip rect');
     document.documentElement.classList.add('shared-coin-ready');
     const reduced=matchMedia('(prefers-reduced-motion: reduce)');
     const clamp=n=>Math.max(0,Math.min(1,n)),mix=(a,b,p)=>a+(b-a)*p;
@@ -14,7 +16,17 @@
     const paths=['rear','rim','front','reeding','face'].map(name=>layer.querySelector('.shared-'+name));
     const ring=(z,c,s)=>Array.from({length:65},(_,i)=>{let t=i/64*Math.PI*2;return[44*Math.cos(t)*c+z*s,44*Math.sin(t)]});
     const outline=pts=>pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join('')+'Z';
-    let angle=.45,last=0,departure=null;
+    let angle=.45,last=0,departure=null,displayed=null;
+    // Use SVG coordinates, not the bounds of hidden geometry (which differ in WebKit).
+    function anatomyPoint(){
+      const m=anatomy.getScreenCTM();
+      if(!m)return read(anatomy,44);
+      return {x:m.e,y:m.f,size:88*Math.max(Math.hypot(m.a,m.b),Math.hypot(m.c,m.d))};
+    }
+    const reset=()=>{last=0;displayed=null;departure=null;};
+    addEventListener('shield-scroll-restored',reset);
+    addEventListener('pageshow',reset);
+    document.addEventListener('visibilitychange',reset);
     // Restoring a later section must not depend on replaying the first trade.
     const resume=window.shieldScrollResume;
     const resumeSection=resume?.section==='closing'?document.querySelector('.closing'):document.getElementById(resume?.section||'');
@@ -27,26 +39,27 @@
     }
     function frame(now){
       requestAnimationFrame(frame);if(document.hidden)return;
-      if(window.shieldScrollRestoring){layer.style.opacity='0';return;}
+      if(window.shieldScrollRestoring){layer.style.opacity='0';displayed=null;last=0;return;}
       const dt=last?Math.min(now-last,60):0;last=now;
       if(!reduced.matches)angle+=dt*Math.PI/4000;
       const flowPoint=read(flow);
-      const points=[read(hero),read(radar),flowPoint,read(anchor)];
-      const diagram=document.querySelector('.flow-diagram');
+      const points=[read(hero),read(radar),flowPoint,anatomyPoint()];
+      const viewportHeight=+diagram.dataset.viewportHeight||innerHeight;
+      const sectionPadding=parseFloat(getComputedStyle(anatomySection).paddingTop)||0;
+      const stageTop=parseFloat(getComputedStyle(anatomyStage).top)||0;
       const nextTop=anatomySection.getBoundingClientRect().top;
-      if(nextTop>=innerHeight*.9)restoredBeyondFlow=false;
+      if(nextTop>=viewportHeight*.9)restoredBeyondFlow=false;
       const flowFirst=diagram.dataset.firstTrade!=='complete'&&!restoredBeyondFlow;
-      const departureStart=nextTop+scrollY-innerHeight*.9;
-      if(nextTop>=innerHeight*.9||flowFirst)departure=null;
+      const departureStart=nextTop+scrollY-viewportHeight*.9;
+      if(nextTop>=viewportHeight*.9||flowFirst)departure=null;
       else if(!departure)departure={x:flowPoint.x,pageY:flowPoint.y+scrollY,size:flowPoint.size};
       if(departure)points[2]={x:departure.x,y:departure.pageY-scrollY,size:departure.size};
       let current=points[0],index=0,travel=0,depositOpacity=1;
       for(let i=0;i<3;i++){
-        if(i===2&&(flowFirst||nextTop>=innerHeight*.9))break;
+        if(i===2&&(flowFirst||nextTop>=viewportHeight*.9))break;
         const a=points[i],b=points[i+1];
-        const anatomySection=document.querySelector('#product'),stage=document.querySelector('.anatomy-stage');
-        const arrival=nextTop+scrollY+parseFloat(getComputedStyle(anatomySection).paddingTop)-parseFloat(getComputedStyle(stage).top);
-        const start=i===2?departureStart:a.y+scrollY-innerHeight*.32,end=i===2?arrival:b.y+scrollY-innerHeight*.55;
+        const arrival=nextTop+scrollY+sectionPadding-stageTop;
+        const start=i===2?departureStart:a.y+scrollY-viewportHeight*.32,end=i===2?arrival:b.y+scrollY-viewportHeight*.55;
         if(scrollY<start)break;
         const p=clamp((scrollY-start)/Math.max(1,end-start));
         if(p>=1){current=b;index=i+1;continue;}
@@ -56,21 +69,29 @@
         current={x:mix(a.x,b.x,eased)+Math.sin(p*Math.PI)*Math.min(70,innerWidth*.08),y:mix(a.y,b.y,p),size:mix(a.size,b.size,eased)+Math.sin(p*Math.PI)*12};
         travel=Math.sin(p*Math.PI);index=i;if(i===1)depositOpacity=1-clamp((p-.88)/.12);break;
       }
-      const restoredArrival=nextTop+parseFloat(getComputedStyle(anatomySection).paddingTop)-parseFloat(getComputedStyle(document.querySelector('.anatomy-stage')).top);
+      const restoredArrival=nextTop+sectionPadding-stageTop;
       if(restoredBeyondFlow&&restoredArrival<=1){current=points[3];index=3;travel=0;depositOpacity=1;}
       let opacity=depositOpacity;let walletClip=0;
-      if(index===0&&!travel)opacity=document.querySelector('[data-institution="hero"]').dataset.formation==='forming'?.3:1;
+      if(index===0&&!travel)opacity=heroScene.dataset.formation==='forming'?.3:1;
       if(index===2&&!travel){
-        const t=+diagram.dataset.flowTime||0;opacity=t<1?clamp((t-.7)/.3):t<(innerWidth>700?12.6:10.2)?1:parseFloat(flow.style.opacity)||0;
-        if(t<1.2){const wallet=document.querySelector('#fund-wallet').getBoundingClientRect(),mouth=wallet.top+wallet.height/2-12;
+        const t=+diagram.dataset.flowTime||0;opacity=Number.parseFloat(flow.style.opacity)||0;
+        if(t<1.2){const walletBounds=wallet.getBoundingClientRect(),mouth=walletBounds.top+walletBounds.height/2-12;
           walletClip=clamp((current.y+current.size*.66-mouth)/(current.size*1.32))*100;}
       }
       if(index===3&&!travel)opacity=parseFloat(getComputedStyle(anatomy).opacity);
       if(current.y<-100||current.y>innerHeight+100||document.querySelector('dialog[open]'))opacity=0;
       const size=Math.max(22,current.size)*116/88;
-      Object.assign(layer.style,{left:current.x+'px',top:current.y+'px',width:size+'px',height:size+'px',opacity:String(opacity)});
+      // Compositor transforms avoid layout/repaint on every frame during touch scrolling.
+      const target={x:current.x,y:current.y,size};
+      const follow=reduced.matches||!displayed?1:1-Math.exp(-dt/45);
+      if(!displayed)displayed={...target};
+      for(const key of ['x','y','size'])displayed[key]=mix(displayed[key],target[key],follow);
+      layer.style.transform=`translate3d(${displayed.x}px,${displayed.y}px,0) translate(-50%,-50%) scale(${displayed.size/116})`;
+      // Keep the travelling coin quiet on mobile, then restore its scene opacity at docking.
+      const transitFade=innerWidth<=700?1-.6*Math.pow(travel,.65):1;
+      layer.style.opacity=String(opacity*transitFade);
       layer.style.setProperty('--journey-blur',String(travel));
-      layer.querySelector('svg').style.clipPath=walletClip?`inset(0 0 ${walletClip}% 0)`:'none';
+      clipRect.setAttribute('height',String(116*(1-walletClip/100)));
       layer.dataset.scene=['hero','exposure','trade','anatomy'][index];layer.dataset.travelling=String(travel>.01);
       drawCoin();
     }
